@@ -73,6 +73,40 @@ def ssh_read(host, user, remote_cmd):
                 f"{user}@{host}", remote_cmd])
 
 
+def get_status(host, user):
+    """Retourne {pc, robot, known, error}. Lecture seule."""
+    st = {"pc": pc_ssid(), "robot": None, "known": [], "error": None}
+    code, out = ssh_read(host, user, "nmcli -t -f NAME,TYPE,DEVICE connection show --active")
+    if code != 0:
+        st["error"] = out or "pas de réponse"
+        return st
+    active = [r for r in parse_nmcli_terse(out) if len(r) >= 3 and r[1] == "802-11-wireless"]
+    st["robot"] = active[0][0] if active else None
+    code, out = ssh_read(host, user, "nmcli -t -f NAME,TYPE connection show")
+    if code == 0:
+        st["known"] = [r[0] for r in parse_nmcli_terse(out) if len(r) >= 2 and r[1] == "802-11-wireless"]
+    return st
+
+
+def add_network(host, user, ssid, psk):
+    """ÉCRIT sur le Pi : enregistre un réseau sans y basculer (la session SSH ne coupe pas).
+
+    Le mot de passe passe par l'entrée standard de ssh : jamais en argument, jamais dans un fichier.
+    À n'appeler qu'après une action explicite de la personne devant le robot.
+    """
+    q = shlex.quote(ssid)
+    remote = ("IFS= read -r PSK; sudo -n nmcli connection add type wifi "
+              f"con-name {q} ssid {q} wifi-sec.key-mgmt wpa-psk wifi-sec.psk \"$PSK\" "
+              "connection.autoconnect yes >/dev/null; rc=$?; unset PSK; exit $rc")
+    try:
+        r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+                            f"{user}@{host}", "bash -c " + shlex.quote(remote)],
+                           input=psk + "\n", capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, str(e)
+    return r.returncode == 0, (r.stderr or r.stdout).strip()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="192.168.1.200")
@@ -93,22 +127,15 @@ def main():
         print("Ne supprime pas l'ancien réseau : il sert de secours. Réseau avec portail captif (hôtel, école) : voir docs/wifi-cadrage.md.")
         return 0
 
-    mine = pc_ssid()
+    st = get_status(args.host, args.user)
+    mine, known = st["pc"], st["known"]
     print(f"WiFi du PC     : {mine or 'inconnu / non connecté en WiFi'}")
-
-    code, out = ssh_read(args.host, args.user,
-                         "nmcli -t -f NAME,TYPE,DEVICE connection show --active")
-    if code != 0:
-        print(f"Robot ({args.user}@{args.host}) : injoignable en SSH -> {out or 'pas de réponse'}")
+    if st["error"]:
+        print(f"Robot ({args.user}@{args.host}) : injoignable en SSH -> {st['error']}")
         print("\nCauses probables : PC et robot pas sur le même réseau, IP différente, "
               "ou isolation entre appareils (réseau public/hôtel/école).")
         return 2
-    active = [r for r in parse_nmcli_terse(out) if len(r) >= 3 and r[1] == "802-11-wireless"]
-    robot = active[0][0] if active else None
-    print(f"WiFi du robot  : {robot or 'pas de WiFi actif (câble ?)'}")
-
-    code, out = ssh_read(args.host, args.user, "nmcli -t -f NAME,TYPE connection show")
-    known = [r[0] for r in parse_nmcli_terse(out) if len(r) >= 2 and r[1] == "802-11-wireless"] if code == 0 else []
+    print(f"WiFi du robot  : {st['robot'] or 'pas de WiFi actif (câble ?)'}")
     print(f"Réseaux connus du robot : {', '.join(known) or 'aucun'}")
 
     if mine and mine in known:

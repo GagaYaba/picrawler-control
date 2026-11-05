@@ -26,4 +26,4 @@ Gaëlle part de chez elle ce week-end et veut continuer à travailler sur le PiC
 - **Toute modification sur le Pi** se fait avec Gaëlle présente, pour reprendre la main si ça tourne mal.
 
 ## État
-Le script PC est en lecture seule : il n'a pas encore été testé contre le vrai robot (non joignable depuis ici).
+Le script `wifi_check.py` est en lecture seule. La fenêtre `wifi_widget.py` (Tkinter) et `picrawler_ssh.py` écrivent sur le Pi uniquement après confirmation. Aucun n’a encore été testé contre le vrai robot ni avec un vrai affichage (Tkinter absent de l’environnement de développement).
