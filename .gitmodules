@@ -1,0 +1,12 @@
+[submodule "picrawler-robot"]
+	path = picrawler-robot
+	url = https://github.com/GagaYaba/picrawler-robot
+[submodule "picrawler-backend"]
+	path = picrawler-backend
+	url = https://github.com/GagaYaba/picrawler-backend
+[submodule "picrawler-frontend"]
+	path = picrawler-frontend
+	url = https://github.com/GagaYaba/picrawler-frontend
+[submodule "picrawler-infra"]
+	path = picrawler-infra
+	url = https://github.com/GagaYaba/picrawler-infra

@@ -7,7 +7,7 @@ Gaëlle part de chez elle ce week-end et veut continuer à travailler sur le PiC
 
 | Option | Principe | Simplicité | Sécurité | Remarque |
 |---|---|---|---|---|
-| A. Script PC (`tools/wifi/wifi_check.py`) | Compare le WiFi du PC et celui du Pi (via SSH + `nmcli`), propose la commande d'ajout | Très simple | Bonne : lecture seule, pas de mot de passe stocké | Marche seulement si le Pi est déjà joignable |
+| A. Script PC (`picrawler-robot/tools/wifi/wifi_check.py`) | Compare le WiFi du PC et celui du Pi (via SSH + `nmcli`), propose la commande d'ajout | Très simple | Bonne : lecture seule, pas de mot de passe stocké | Marche seulement si le Pi est déjà joignable |
 | B. Page web locale | Petit formulaire sur le PC | Moyen | Risque de manipuler des mots de passe dans une appli | Pas utile pour un projet étudiant, pour l'instant |
 | C. Point d'accès de secours sur le Pi | Si aucun WiFi connu n'est trouvé, le Pi crée son propre WiFi | Moyen, à tester | Bonne, et c'est le seul filet si le réseau est perdu | À préparer à la maison, pas en dernière minute |
 | D. Hotspot du téléphone | Le téléphone partage sa 4G/5G, PC et Pi s'y connectent | Très simple | Bonne | Réseau le plus fiable en déplacement : on l'ajoute au Pi avant de partir |
@@ -16,7 +16,7 @@ Gaëlle part de chez elle ce week-end et veut continuer à travailler sur le PiC
 1. **Avant de partir** : ajouter au Pi le hotspot du téléphone (option D) et, si possible, le WiFi du lieu où tu seras. Vérifier avec le script (option A).
 2. Utiliser le script A au lancement des sessions pour détecter la différence de réseaux.
 3. Option C en second temps, comme filet de sécurité.
-4. Le « widget » s'ajoutera plus tard par-dessus le script A (même logique, juste une fenêtre) : inutile de le construire avant d'avoir validé la logique.
+4. La fenêtre (widget) est construite par-dessus le script A (même logique) : elle est maintenant dans `picrawler-robot`.
 
 ## Risques et parades
 - **Se verrouiller hors du robot** : ne jamais supprimer l'ancien réseau, ne jamais lancer une commande qui bascule de réseau pendant la session SSH (on utilise `nmcli connection add`, qui enregistre sans basculer). Garder un accès de secours (câble, écran/clavier, ou point d'accès C).
@@ -26,4 +26,4 @@ Gaëlle part de chez elle ce week-end et veut continuer à travailler sur le PiC
 - **Toute modification sur le Pi** se fait avec Gaëlle présente, pour reprendre la main si ça tourne mal.
 
 ## État
-Le script `wifi_check.py` est en lecture seule. La fenêtre `wifi_widget.py` (Tkinter) et `picrawler_ssh.py` écrivent sur le Pi uniquement après confirmation. Aucun n’a encore été testé contre le vrai robot ni avec un vrai affichage (Tkinter absent de l’environnement de développement).
+Au 6 novembre 2026 : la lecture (fenêtre `wifi_widget.py`) a été testée sur le vrai robot depuis un PC Windows, et l'ajout du hotspot du téléphone a été fait et vérifié à la main avec `nmcli`. Le bouton d'ajout de la fenêtre et `picrawler_ssh.py` n'ont pas encore été testés en vrai.
