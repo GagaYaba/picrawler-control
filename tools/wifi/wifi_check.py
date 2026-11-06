@@ -73,18 +73,40 @@ def ssh_read(host, user, remote_cmd):
                 f"{user}@{host}", remote_cmd])
 
 
+# Lecture seule côté Pi : renvoie les SSID (pas les noms de profil, qui peuvent différer,
+# par ex. « netplan-wlan0-Bbox-10A57558 » pour le WiFi « Bbox-10A57558 »).
+REMOTE_LIST = (
+    "list() { nmcli -t -f NAME,TYPE connection show $1 | grep ':802-11-wireless$' "
+    "| sed 's/:802-11-wireless$//; s/\\\\:/:/g'; }; "
+    "list --active | while IFS= read -r n; do "
+    "echo \"ACTIVE:$(nmcli -g 802-11-wireless.ssid connection show \"$n\")\"; done; "
+    "list | while IFS= read -r n; do "
+    "echo \"KNOWN:$(nmcli -g 802-11-wireless.ssid connection show \"$n\")\"; done"
+)
+
+
+def parse_remote_list(text):
+    """Texte ACTIVE:/KNOWN: -> (ssid actif ou None, liste des ssid connus sans doublon)."""
+    active, known = None, []
+    for line in text.splitlines():
+        kind, _, ssid = line.partition(":")
+        if not ssid:
+            continue
+        if kind == "ACTIVE" and active is None:
+            active = ssid
+        elif kind == "KNOWN" and ssid not in known:
+            known.append(ssid)
+    return active, known
+
+
 def get_status(host, user):
     """Retourne {pc, robot, known, error}. Lecture seule."""
     st = {"pc": pc_ssid(), "robot": None, "known": [], "error": None}
-    code, out = ssh_read(host, user, "nmcli -t -f NAME,TYPE,DEVICE connection show --active")
+    code, out = ssh_read(host, user, "bash -c " + shlex.quote(REMOTE_LIST))
     if code != 0:
         st["error"] = out or "pas de réponse"
         return st
-    active = [r for r in parse_nmcli_terse(out) if len(r) >= 3 and r[1] == "802-11-wireless"]
-    st["robot"] = active[0][0] if active else None
-    code, out = ssh_read(host, user, "nmcli -t -f NAME,TYPE connection show")
-    if code == 0:
-        st["known"] = [r[0] for r in parse_nmcli_terse(out) if len(r) >= 2 and r[1] == "802-11-wireless"]
+    st["robot"], st["known"] = parse_remote_list(out)
     return st
 
 
