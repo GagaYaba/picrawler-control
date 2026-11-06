@@ -16,12 +16,23 @@ import subprocess
 import sys
 
 
-def run(cmd, timeout=15):
+def decode(raw, windows_console=False):
+    """Décode une sortie de commande sans jamais planter (accents, console Windows)."""
+    if windows_console and platform.system() == "Windows":
+        try:
+            return raw.decode("oem")  # console Windows (cp850 en français)
+        except (LookupError, UnicodeDecodeError):
+            pass
+    return raw.decode("utf-8", errors="replace")
+
+
+def run(cmd, timeout=15, windows_console=False, stdin=None):
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, capture_output=True, timeout=timeout, input=stdin)
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, str(e)
-    return r.returncode, (r.stdout if r.returncode == 0 else r.stderr).strip()
+    out = decode(r.stdout if r.returncode == 0 else r.stderr, windows_console).strip()
+    return r.returncode, out
 
 
 def parse_netsh(text):
@@ -57,7 +68,7 @@ def parse_nmcli_terse(text):
 def pc_ssid():
     system = platform.system()
     if system == "Windows":
-        code, out = run(["netsh", "wlan", "show", "interfaces"])
+        code, out = run(["netsh", "wlan", "show", "interfaces"], windows_console=True)
         return parse_netsh(out) if code == 0 else None
     if system == "Linux":
         code, out = run(["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"])
@@ -120,13 +131,10 @@ def add_network(host, user, ssid, psk):
     remote = ("IFS= read -r PSK; sudo -n nmcli connection add type wifi "
               f"con-name {q} ssid {q} wifi-sec.key-mgmt wpa-psk wifi-sec.psk \"$PSK\" "
               "connection.autoconnect yes >/dev/null; rc=$?; unset PSK; exit $rc")
-    try:
-        r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-                            f"{user}@{host}", "bash -c " + shlex.quote(remote)],
-                           input=psk + "\n", capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return False, str(e)
-    return r.returncode == 0, (r.stderr or r.stdout).strip()
+    code, out = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+                     f"{user}@{host}", "bash -c " + shlex.quote(remote)],
+                    timeout=30, stdin=(psk + "\n").encode("utf-8"))
+    return code == 0, out
 
 
 def main():

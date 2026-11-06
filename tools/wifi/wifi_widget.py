@@ -107,8 +107,14 @@ class App(tk.Tk):
     def refresh(self):
         self.msg.config(text="Lecture du robot…", fg=MUTED)
         self.add_btn.config(state="disabled")
-        threading.Thread(target=lambda: self.q.put(("status", core.get_status(self.host, self.user))),
-                         daemon=True).start()
+        threading.Thread(target=self.read_status, daemon=True).start()
+
+    def read_status(self):
+        try:
+            st = core.get_status(self.host, self.user)
+        except Exception as e:  # ne jamais laisser la fenêtre bloquée sur « Lecture… »
+            st = {"pc": None, "robot": None, "known": [], "error": f"erreur interne : {e}"}
+        self.q.put(("status", st))
 
     def apply_status(self, st):
         self.status = st
@@ -179,9 +185,15 @@ class App(tk.Tk):
                                    "Tu dois être devant le robot pour reprendre la main si besoin."):
             return
         self.err.config(fg=MUTED, text="Enregistrement…")
-        threading.Thread(target=lambda: self.q.put(("added", core.add_network(self.host, self.user, ssid, psk))),
-                         daemon=True).start()
+        threading.Thread(target=self.write_network, args=(ssid, psk), daemon=True).start()
         self.psk.delete(0, "end")  # le mot de passe ne reste pas dans la fenêtre
+
+    def write_network(self, ssid, psk):
+        try:
+            res = core.add_network(self.host, self.user, ssid, psk)
+        except Exception as e:
+            res = (False, f"erreur interne : {e}")
+        self.q.put(("added", res))
 
     def poll(self):
         try:
